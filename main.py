@@ -3,9 +3,10 @@ from selenium.webdriver.common.by import By
 import time
 import urllib.request
 from zipfile import ZipFile 
-import pdfplumber
 from selenium.webdriver.chrome.options import Options
 import os
+import pdfplumber  
+import csv 
 
 arquivos_dentro_files_pdf = os.listdir("files_pdf") #Lista de arquivos dentro da pasta files
 
@@ -13,7 +14,7 @@ arquivos_dentro_files_pdf = os.listdir("files_pdf") #Lista de arquivos dentro da
 for file in arquivos_dentro_files_pdf: #percorre a pasta arquivo por arquivo.
      os.remove(os.path.join("files_pdf", file)) #deleta o arquivo encontrado em file
 
-#Navegar até o site
+
 download_dir = os.path.abspath("files_pdf") #caminho até a pasta file_pdf
 
 #Passando prefs personalizadas para o chrome com intuito de não abrir a pagina de visualização de pdf.
@@ -24,6 +25,7 @@ options.add_experimental_option("prefs", {
     "download.prompt_for_download": False,  #Não abrir a janela de salvar como, salva direto sem perguntar.
     "download.directory_upgrade": True  #forçar o chrome a baixar dentro da pasta definida na variável, mesmo que nao tenha a pasta definida como padrão no chrome.
 })
+#navegar ate o site
 navegador = webdriver.Chrome(options=options)
 
 #Url do site e baixar os anexos 1 e 2
@@ -31,6 +33,8 @@ navegador.get("https://www.gov.br/ans/pt-br/acesso-a-informacao/participacao-da-
 elemento = navegador.find_element(By.XPATH, '/html/body/div[5]/div/div/div/div/div[2]/button[2]').click()
 elemento = navegador.find_element(By.XPATH, '//*[@id="cfec435d-6921-461f-b85a-b425bc3cb4a5"]/div/ol/li[1]/a[1]').click()
 elemento = navegador.find_element(By.XPATH, '//*[@id="cfec435d-6921-461f-b85a-b425bc3cb4a5"]/div/ol/li[2]/a').click()
+
+print("Downloads dos anexos 1 e 2 feito com sucesso!")
 
 #Outra opçao de download sem precisar usar o selenium (utilizando urllib.requests.urlretrieve)
 
@@ -69,18 +73,58 @@ with ZipFile("anexos_compactados.zip", "w") as zip:
 
 print("Arquivos compactados com sucesso!")
 
-#2 - Extraindo dados da tabela ROL (anexo1)
-caminho_extraçaoTabela1 = "C:\\Users\\COMPUTADOR\\OneDrive\\Documentos\\IntuitiveCare\\download.pdf1"
+#Funcao para substituir as abreviacoes 
+def substituir_abreviacoes(linha):
+    legenda_abreviacoes = {
+        "OD" : "Odontologica",
+       "AMB" : "Ambulatorial"
+    }
+    linha_atualizada = [legenda_abreviacoes.get(item, item) for item in linha]
+    return linha_atualizada
 
-with pdfplumber.open(caminho_extraçaoTabela1) as pdf:
-    todas_tabelas = []
+#Extraindo os dados da tabela
+for arquivo in pdfs: #percorrer somente o anexo1
+    if "Anexo_I_Rol_2021RN_465.2021_RN627L.2024.pdf" in arquivo: #percorrer somente o anexo1 
+        arquivo_anexo1 = os.path.join(download_dir, arquivo) 
+        break #intorromper assim o anexo1 for encontrado
 
-    for pagina in pdf.pages:
-        tabela = pagina.extract_table()
+with pdfplumber.open(arquivo_anexo1) as pdf: #Abrir o arquivo e extrair a tabela
+    todas_tabelas = [] #Lista para armazenar as tabelas extraidas
+
+    for pagina in pdf.pages: #percorrer cada pagina do pdf
+        tabela = pagina.extract_table() #extrair as tabelas da pagina
         if tabela:
-            todas_tabelas.append(tabela)
+            todas_tabelas.append(tabela) #adicionando tabela extraida a lista 
 
-    for i, tabela in enumerate(todas_tabelas): 
-            print(f"Tabela {i+1}") 
-    for linha in tabela: 
-            print(linha)
+
+
+    #Abrir o arquivo para a leitura da tabela
+    with open('tabelas_extraidas_anexo1.csv', mode='w', newline='', encoding='utf-8') as file_csv:
+        writer = csv.writer(file_csv)
+        
+        for i, tabela in enumerate(todas_tabelas): # usei enumerate para obter os valores de cada item
+            print(f"Tabela {i+1}")  #Imprimir o numero no console de qual tabela está sendo processada
+            for linha in tabela: #percorre linha por linha da tabela
+                try:
+                    # Imprimir cada célula da linha, lidando com erros de codificação
+                    linha_impressa = [item.encode('utf-8', errors='ignore').decode('utf-8') if isinstance(item, str) else item for item in linha]
+                    print(linha_impressa)  # Imprimir a linha, corrigida para codificação UTF-8
+                except UnicodeEncodeError:
+                    print("Erro ao tentar imprimir linha com caracteres especiais")
+                    linha_impressa = [item.encode('utf-8', errors='ignore').decode('utf-8') if isinstance(item, str) else item for item in linha]
+                    print(linha_impressa)
+                writer.writerow(linha)  # Escrever a linha no arquivo CSV
+            print("Dados extraídos para pasta CSV com sucesso!")
+    
+            
+
+#Compactando o csv em um arquivo zip
+csv_filename = 'tabelas_extraidas_anexo1.csv' #caminho do arquivo a ser compactado em zip
+zip_filename = 'Teste_{tabela_em_zip}.zip' #Nome do novo arquivo zip
+
+#Compactar em zip
+with ZipFile(zip_filename, "w") as zip:
+    zip.write(csv_filename, arcname=os.path.basename(csv_filename)) #adicionando o arquivo csv em arquivo zip
+    print("Arquivo csv compactado em zip com sucesso!")
+
+
