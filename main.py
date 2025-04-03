@@ -7,6 +7,9 @@ from selenium.webdriver.chrome.options import Options
 import os
 import pdfplumber  
 import csv 
+import sys
+
+sys.stdout.reconfigure(encoding='utf-8') #garantir que o terminal consiga exibir os caracteres especiais.
 
 arquivos_dentro_files_pdf = os.listdir("files_pdf") #Lista de arquivos dentro da pasta files
 
@@ -74,13 +77,15 @@ with ZipFile("anexos_compactados.zip", "w") as zip:
 print("Arquivos compactados com sucesso!")
 
 #Funcao para substituir as abreviacoes 
-def substituir_abreviacoes(linha):
+def substituir_abreviacoes(texto):
     legenda_abreviacoes = {
         "OD" : "Odontologica",
        "AMB" : "Ambulatorial"
     }
-    linha_atualizada = [legenda_abreviacoes.get(item, item) for item in linha]
-    return linha_atualizada
+    if isinstance(texto, str):  # Garante que só mexe em strings
+        texto = texto.strip() #remove espaços ao redor
+        return legenda_abreviacoes.get(texto, texto) #substitui apenas se a sigla for exatamente como escrita
+    return texto 
 
 #Extraindo os dados da tabela
 for arquivo in pdfs: #percorrer somente o anexo1
@@ -101,20 +106,21 @@ with pdfplumber.open(arquivo_anexo1) as pdf: #Abrir o arquivo e extrair a tabela
     #Abrir o arquivo para a leitura da tabela
     with open('tabelas_extraidas_anexo1.csv', mode='w', newline='', encoding='utf-8') as file_csv:
         writer = csv.writer(file_csv)
-        
+      
+
+# Escrever a linha corrigida no CSV
         for i, tabela in enumerate(todas_tabelas): # usei enumerate para obter os valores de cada item
             print(f"Tabela {i+1}")  #Imprimir o numero no console de qual tabela está sendo processada
             for linha in tabela: #percorre linha por linha da tabela
-                try:
+                try: #inicia um bloco de codigo que pode gerar erros
                     # Imprimir cada célula da linha, lidando com erros de codificação
                     linha_impressa = [item.encode('utf-8', errors='ignore').decode('utf-8') if isinstance(item, str) else item for item in linha]
                     print(linha_impressa)  # Imprimir a linha, corrigida para codificação UTF-8
-                except UnicodeEncodeError:
-                    print("Erro ao tentar imprimir linha com caracteres especiais")
-                    linha_impressa = [item.encode('utf-8', errors='ignore').decode('utf-8') if isinstance(item, str) else item for item in linha]
-                    print(linha_impressa)
-                writer.writerow(linha)  # Escrever a linha no arquivo CSV
-            print("Dados extraídos para pasta CSV com sucesso!")
+                    #Pula do try para except para tratar erros, capturando erros e armazenando na variavel e.
+                except Exception as e:
+                    print(f"Erro ao processar linha: {e}")
+                    linha_impressa = linha #caso de erro mantem a linha original para continuar rodando
+
     
             
 
@@ -126,5 +132,6 @@ zip_filename = 'Teste_{tabela_em_zip}.zip' #Nome do novo arquivo zip
 with ZipFile(zip_filename, "w") as zip:
     zip.write(csv_filename, arcname=os.path.basename(csv_filename)) #adicionando o arquivo csv em arquivo zip
     print("Arquivo csv compactado em zip com sucesso!")
+    
 
 
