@@ -82,14 +82,15 @@ def substituir_abreviacoes(texto):
         "OD" : "Odontologica",
        "AMB" : "Ambulatorial"
     }
+
     if isinstance(texto, str):  # Garante que só mexe em strings
         texto = texto.strip() #remove espaços ao redor
         return legenda_abreviacoes.get(texto, texto) #substitui apenas se a sigla for exatamente como escrita
-    return texto 
+    return texto
 
 #Extraindo os dados da tabela
 for arquivo in pdfs: #percorrer somente o anexo1
-    if "Anexo_I_Rol_2021RN_465.2021_RN627L.2024.pdf" in arquivo: #percorrer somente o anexo1 
+    if "Anexo_I_" in arquivo: #percorrer somente o anexo1 
         arquivo_anexo1 = os.path.join(download_dir, arquivo) 
         break #intorromper assim o anexo1 for encontrado
 
@@ -108,18 +109,6 @@ with pdfplumber.open(arquivo_anexo1) as pdf: #Abrir o arquivo e extrair a tabela
         writer = csv.writer(file_csv)
       
 
-# Escrever a linha corrigida no CSV
-        for i, tabela in enumerate(todas_tabelas): # usei enumerate para obter os valores de cada item
-            print(f"Tabela {i+1}")  #Imprimir o numero no console de qual tabela está sendo processada
-            for linha in tabela: #percorre linha por linha da tabela
-                try: #inicia um bloco de codigo que pode gerar erros
-                    # Imprimir cada célula da linha, lidando com erros de codificação
-                    linha_impressa = [item.encode('utf-8', errors='ignore').decode('utf-8') if isinstance(item, str) else item for item in linha]
-                    print(linha_impressa)  # Imprimir a linha, corrigida para codificação UTF-8
-                    #Pula do try para except para tratar erros, capturando erros e armazenando na variavel e.
-                except Exception as e:
-                    print(f"Erro ao processar linha: {e}")
-                    linha_impressa = linha #caso de erro mantem a linha original para continuar rodando
 
     
             
